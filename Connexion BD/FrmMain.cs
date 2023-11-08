@@ -19,6 +19,9 @@ namespace Connexion_BD
         public FrmMain()
         {
             InitializeComponent();
+            tcView.Enabled = false;
+            UDSelectMax.Enabled = false;
+            UDSelectMin.Enabled = false;
         }
 
         private void btConnect_Click(object sender, EventArgs e)
@@ -33,7 +36,8 @@ namespace Connexion_BD
                 );
 
                 connection.Open();
-
+                tcView.Enabled = true;
+                SelectLocations();
                 Console.WriteLine("Connected!");
             }
             catch ( SqlException ex ) 
@@ -48,6 +52,7 @@ namespace Connexion_BD
             {
                 connection.Close();
                 connection = null;
+                tcView.Enabled = false;
                 Console.WriteLine("Closed");
             }
         }
@@ -90,27 +95,41 @@ namespace Connexion_BD
             List<Job> jobs = new List<Job>();
             try
             {
-                string query = "SELECT * FROM JOBS";
-                SqlCommand command = new SqlCommand(query, connection);
-                SqlDataAdapter adapter = new SqlDataAdapter(command);
+                string query;
 
-                var myTable = new DataTable();
-                adapter.Fill(myTable);
-                dgvJobs.DataSource = myTable;
+                if (cbAllJobs.Checked)
+                    query = "SELECT * FROM JOBS";
+                else
+                    query = "SELECT * FROM JOBS WHERE min_salary >= @jobMin AND max_salary <= @jobMax";
 
-                SqlDataReader reader = command.ExecuteReader();
-
-                while(reader.Read())
+                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
                 {
-                    int job_id = reader.GetInt32(0);
-                    string job_title = reader.GetString(1);
-                    decimal min_salary = reader.IsDBNull(2) ? 0 : reader.GetDecimal(2);
-                    decimal max_salart = reader.IsDBNull(3) ? 0 : reader.GetDecimal(3);
+                    if (!cbAllJobs.Checked)
+                    {
+                        command.Parameters.AddWithValue("@jobMax", UDSelectMax.Value);
+                        command.Parameters.AddWithValue("@jobMin", UDSelectMin.Value);
+                    }
 
-                    Job j = new Job(job_title, min_salary, max_salart);
-                    jobs.Add(j);
+                    var myTable = new DataTable();
+                    adapter.Fill(myTable);
+                    dgvJobs.DataSource = myTable;
+
+                    SqlDataReader reader = command.ExecuteReader();
+                    reader.Close();
                 }
-                reader.Close();
+
+                //while(reader.Read())
+                //{
+                //    int job_id = reader.GetInt32(0);
+                //    string job_title = reader.GetString(1);
+                //    decimal min_salary = reader.IsDBNull(2) ? 0 : reader.GetDecimal(2);
+                //    decimal max_salart = reader.IsDBNull(3) ? 0 : reader.GetDecimal(3);
+
+                //    Job j = new Job(job_title, min_salary, max_salart);
+                //    jobs.Add(j);
+                //}
+                //reader.Close();
             }
             catch (SqlException ex)
             {
@@ -132,6 +151,89 @@ namespace Connexion_BD
             //{
             //    lbSelect.Items.Add(j.job_title + ":  " + j.min_salary + "-" + j.max_salary);
             //}
+        }
+
+        private void cbAll_CheckedChanged(object sender, EventArgs e)
+        {
+            if (cbAllJobs.Checked)
+            {
+                UDSelectMax.Enabled = false; 
+                UDSelectMin.Enabled = false;
+            }
+            else
+            {
+                UDSelectMax.Enabled = true; 
+                UDSelectMin.Enabled = true;
+            }
+        }
+
+
+        void InsertEmployee(Employees employee)
+        {
+
+        }
+
+        void SelectLocations()
+        {
+            try
+            {
+                string query = "SELECT * FROM LOCATIONS";
+
+                SqlCommand command = new SqlCommand(query, connection);
+                SqlDataReader reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    string city = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    cbSelec_Location.Items.Add(city);
+                }
+
+                reader.Close();
+            }
+            catch (SqlException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+        void SelectEmployees()
+        {
+            try
+            {
+                string query = "";
+
+                if (cbSelec_Location.SelectedIndex != -1)
+                    query = "SELECT E.* FROM EMPLOYEES E " +
+                            "INNER JOIN departments D ON D.department_id = E.department_id " +
+                            "INNER JOIN locations L ON L.location_id = D.location_id " +
+                            "WHERE E.first_name LIKE '" + tbSelect_FirstName_Employee.Text + "%' AND E.last_name LIKE '" + tbSelect_LastName_Employee.Text + "%' " +
+                            "AND L.city = '" + cbSelec_Location.SelectedItem.ToString() + "'";
+                else
+                    query = "SELECT * FROM EMPLOYEES " +
+                            "WHERE first_name LIKE '" + tbSelect_FirstName_Employee.Text + "%' AND last_name LIKE '" + tbSelect_LastName_Employee.Text + "%'";
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                {
+                    var myTable = new DataTable();
+                    adapter.Fill(myTable);
+                    dgvEmployee.DataSource = myTable;
+                }
+            }
+            catch (SqlException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+        private void btSelectEmployee_Click(object sender, EventArgs e)
+        {
+            SelectEmployees();
+        }
+
+        private void btInsetEmployee_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
